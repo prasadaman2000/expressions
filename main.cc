@@ -33,49 +33,32 @@ std::vector<std::string> tokenize(std::string expr) {
 std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) { 
     std::shared_ptr<Operation> last_oper;
     std::stack<Expression*> exp_stack;
-    for (std::string token : tokens) {
-        if(isdigit(token[0])) {
-            float val = std::stof(token);
-            if (exp_stack.empty()) {
-                Constant *c = new Constant(val);
-                exp_stack.push(c);
-            } else {
-                auto top = exp_stack.top();
-                std::cout << "type_id: " << typeid(*top).name() << "\n";
-                if(Expr::is_constant(top)) {
-                    std::cout << "Error: constant came after constant\n";
-                    return nullptr;
-                } else if(Expr::is_operation(top)) {
-                    auto opr = (Operation*)top;
-                    if (opr -> is_complete()){
-                        std::cout << "Error: can't add constant to complete operation.\n";
-                        return nullptr;
-                    }
-                    opr -> set_right(std::make_shared<Constant>(val));
-                    std::string opr_id = opr -> get_op().id();
-                    if(is_high_prio_operator(opr_id)){
-                        if(exp_stack.size() > 1){
-                            exp_stack.pop();
-                            if(Expr::is_operation(exp_stack.top())){
-                                Operation* top_2 = (Operation*)exp_stack.top();
-                                std::string top_2_opr = top_2 -> get_op().id();
-                                if(is_high_prio_operator(opr_id)){
-                                    top_2 -> set_right(std::make_shared<Operation>(
-                                        opr -> get_left(),
-                                        opr -> get_right(),
-                                        opr -> get_op()
-                                    ));
-                                    delete opr;
-                                } else {
-                                    exp_stack.push(opr);
-                                }
-                            } else {
-                                exp_stack.push(opr);
-                            }
-                        }
-                    }
+    for (auto tokenp = tokens.begin(); tokenp != tokens.end(); ++tokenp) {
+        auto token = *tokenp;
+        Expression *uninserted = nullptr;
+        if(token == "("){
+            auto token_iter = tokenp + 1;
+            int num_open_paren = 1;
+            while(num_open_paren > 0 && token_iter != tokens.end()){
+                if (*token_iter == ")") {
+                    --num_open_paren;
+                } else if (*token_iter == "(") {
+                    ++num_open_paren;
                 }
+                ++token_iter;
             }
+            if(num_open_paren > 0){
+                std::cout << "Error: unmatched parens\n";
+                return nullptr;
+            }
+            std::shared_ptr<Expression> in_paren =
+                tokens_to_expr(std::vector<std::string>(tokenp + 1, token_iter - 1));
+            auto zero = std::make_shared<Constant>(0);
+            Operation* paren_oper = new Operation(zero, in_paren, predef_operators.at("+"));
+            uninserted = paren_oper;
+            tokenp = token_iter;
+        } else if(isdigit(token[0])) {
+            uninserted = new Constant(std::stof(token));
         } else {
             if(is_high_prio_operator(token)) {
                 auto top = exp_stack.top();
@@ -118,6 +101,54 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                 exp_stack.push(o);
             }
         }
+        
+        if (uninserted != nullptr) {
+            if (exp_stack.empty()) {
+                exp_stack.push(uninserted);
+            } else {
+                auto top = exp_stack.top();
+                std::cout << "type_id: " << typeid(*top).name() << "\n";
+                if(Expr::is_constant(top)) {
+                    std::cout << "Error: constant/paren came after constant\n";
+                    return nullptr;
+                } else if(Expr::is_operation(top)) {
+                    auto opr = (Operation*)top;
+                    if (opr -> is_complete()){
+                        std::cout << "Error: can't add constant/paren to complete operation.\n";
+                        return nullptr;
+                    }
+                    if(Expr::is_constant(uninserted)){
+                        opr -> set_right(std::make_shared<Constant>(uninserted -> evaluate()));
+                    } else if (Expr::is_operation(uninserted)){
+                        Operation* paren_op = (Operation*) uninserted;
+                        opr -> set_right(
+                            std::make_shared<Operation>(paren_op -> get_left(), paren_op -> get_right(), paren_op -> get_op()));
+                    }
+                    std::string opr_id = opr -> get_op().id();
+                    if(is_high_prio_operator(opr_id)){
+                        if(exp_stack.size() > 1){
+                            exp_stack.pop();
+                            if(Expr::is_operation(exp_stack.top())){
+                                Operation* top_2 = (Operation*)exp_stack.top();
+                                std::string top_2_opr = top_2 -> get_op().id();
+                                if(is_high_prio_operator(opr_id)){
+                                    top_2 -> set_right(std::make_shared<Operation>(
+                                        opr -> get_left(),
+                                        opr -> get_right(),
+                                        opr -> get_op()
+                                    ));
+                                    delete opr;
+                                } else {
+                                    exp_stack.push(opr);
+                                }
+                            } else {
+                                exp_stack.push(opr);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         std::cout << "stack size: " << exp_stack.size() << std::endl;
         // std::cout << "value of top is " << exp_stack.top()->evaluate() << std::endl;
     }
@@ -151,7 +182,7 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
 }
 
 int main() {
-    std::string x = "1 - 2 * 2 * 3 / 4 - 4 * 5";
+    std::string x = "( 1 + 2 ) * ( ( ( 1 + 2 ) ^ 3 ) + 4 )";
     // std::string x = "1 + 2 + 3";
     // std::string x = "1234 * 1234";
     // std::string x = "123 123";
