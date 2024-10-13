@@ -36,6 +36,10 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
     for (auto tokenp = tokens.begin(); tokenp != tokens.end(); ++tokenp) {
         auto token = *tokenp;
         Expression *uninserted = nullptr;
+
+        // if parentheses, create expression out of everything in between the parens
+        // creates a  (0 + expr) in order to support the RHS stealing that comes
+        // out of multiplications
         if(token == "("){
             auto token_iter = tokenp + 1;
             int num_open_paren = 1;
@@ -60,6 +64,8 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
         } else if(isdigit(token[0])) {
             uninserted = new Constant(std::stof(token));
         } else {
+            // if operation is a * / ^, take the RHS of the last operation and make it
+            // the current operation's LHS. Push operation onto stack
             if(is_high_prio_operator(token)) {
                 auto top = exp_stack.top();
                 std::cout << "is high " << std::endl;
@@ -84,6 +90,8 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                     exp_stack.push(o);
                 }
             } else if(is_low_prio_operation(token)) {
+                // if low priority operation, then naively take
+                // last thing on stack, and make it the LHS
                 auto top = exp_stack.top();
                 exp_stack.pop();
                 std::cout << "is low " << std::endl;
@@ -102,6 +110,14 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
             }
         }
         
+        // if the last thing was uninserted (paren exp or a constant)
+        //  if stack is empty, put it on stack
+        //  if the last thing on the stack is an operation
+        //      add uninserted as RHS of top of stack
+        //          if top of stack is high prio and second from top of stack is high prio
+        //              make top of stack the RHS of second from top
+        //              this ensures that all consecutive high priority operations
+        //              are grouped and executed together
         if (uninserted != nullptr) {
             if (exp_stack.empty()) {
                 exp_stack.push(uninserted);
