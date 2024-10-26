@@ -17,7 +17,7 @@ std::vector<std::string> tokenize(std::string expr) {
     std::vector<std::string> tokens;
     std::string cur_token = "";
     for (char c : expr) {
-        if (isdigit(c)) {
+        if (isalnum(c)) {
             cur_token += c;
         } else {
             tokens.push_back(cur_token);
@@ -29,7 +29,25 @@ std::vector<std::string> tokenize(std::string expr) {
     return tokens;
 }
 
-std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) { 
+bool is_number(std::string s){
+    for (char c : s){
+        if(!isdigit(c)){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_word(std::string s) {
+    for (char c : s){
+        if(!isalnum(c)){
+            return false;
+        }
+    }
+    return true;
+}
+
+std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Environment* env) { 
     std::shared_ptr<Operation> last_oper;
     std::stack<Expression*> exp_stack;
     for (auto tokenp = tokens.begin(); tokenp != tokens.end(); ++tokenp) {
@@ -55,13 +73,15 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                 return nullptr;
             }
             std::shared_ptr<Expression> in_paren =
-                tokens_to_expr(std::vector<std::string>(tokenp + 1, token_iter - 1));
+                tokens_to_expr(std::vector<std::string>(tokenp + 1, token_iter - 1), env);
             auto zero = std::make_shared<Constant>(0);
             Operation* paren_oper = new Operation(zero, in_paren, predef_operators.at("+"));
             uninserted = paren_oper;
             tokenp = token_iter;
-        } else if(isdigit(token[0])) {
+        } else if(is_number(token)) {
             uninserted = new Constant(std::stof(token));
+        } else if(is_word(token)) {
+            uninserted = new Variable(token);
         } else {
             // if operation is a * / ^, take the RHS of the last operation and make it
             // the current operation's LHS. Push operation onto stack
@@ -72,7 +92,7 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                 if(Expr::is_constant(top)){
                     Operation *o = new Operation();
                     o -> set_op(predef_operators.at(token));
-                    o -> set_left(std::make_shared<Constant>(top->evaluate()));
+                    o -> set_left(std::make_shared<Constant>(top->evaluate(env)));
                     exp_stack.pop();
                     exp_stack.push(o);
                     delete top;
@@ -87,6 +107,13 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                     o -> set_left(opr->get_right());
                     opr->set_right(nullptr);
                     exp_stack.push(o);
+                } else if(Expr::is_variable(top)) {
+                    Operation *o = new Operation();
+                    o -> set_op(predef_operators.at(token));
+                    o -> set_left(std::make_shared<Variable>(((Variable*)(top)) -> get_name()));
+                    exp_stack.pop();
+                    exp_stack.push(o);
+                    delete top;
                 }
             } else if(Expr::is_low_prio_operation(token)) {
                 // if low priority operation, then naively take
@@ -97,12 +124,15 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                 std::cout << "top is a: " << (int)top->Type() << std::endl;
                 Operation *o = new Operation();
                 if(Expr::is_constant(top)){
-                    o -> set_left(std::make_shared<Constant>(top -> evaluate()));
+                    o -> set_left(std::make_shared<Constant>(top -> evaluate(env)));
                     delete top;
                 } else if (Expr::is_operation(top)) {
                     Operation* toper = (Operation*)top;
                     o -> set_left(std::make_shared<Operation>(toper -> get_left(), toper -> get_right(), toper -> get_op()));
                     delete toper;
+                } else if (Expr::is_variable(top)) {
+                    Variable* topvar = (Variable*)top;
+                    o -> set_left(std::make_shared<Variable>(topvar -> get_name()));
                 }
                 o -> set_op(predef_operators.at(token));
                 exp_stack.push(o);
@@ -123,8 +153,8 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
             } else {
                 auto top = exp_stack.top();
                 std::cout << "type_id: " << typeid(*top).name() << "\n";
-                if(Expr::is_constant(top)) {
-                    std::cout << "Error: constant/paren came after constant\n";
+                if(Expr::is_constant(top) || Expr::is_variable(top)) {
+                    std::cout << "Error: constant/paren came after constant/variable\n";
                     return nullptr;
                 } else if(Expr::is_operation(top)) {
                     auto opr = (Operation*)top;
@@ -133,11 +163,14 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                         return nullptr;
                     }
                     if(Expr::is_constant(uninserted)){
-                        opr -> set_right(std::make_shared<Constant>(uninserted -> evaluate()));
+                        opr -> set_right(std::make_shared<Constant>(uninserted -> evaluate(env)));
                     } else if (Expr::is_operation(uninserted)){
                         Operation* paren_op = (Operation*) uninserted;
                         opr -> set_right(
                             std::make_shared<Operation>(paren_op -> get_left(), paren_op -> get_right(), paren_op -> get_op()));
+                    } else if (Expr::is_variable(uninserted)){
+                        Variable* topvar = (Variable*) uninserted;
+                        opr -> set_right(std::make_shared<Variable>(topvar -> get_name()));
                     }
                     std::string opr_id = opr -> get_op().id();
                     if(Expr::is_high_prio_operator(opr_id)){
@@ -178,7 +211,10 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
                     toper -> get_left(), toper -> get_right(), toper -> get_op()));
         } else if(Expr::is_constant(top)) {
             ((Operation*)exp_stack.top()) -> set_right(
-                std::make_shared<Constant>(top -> evaluate()));
+                std::make_shared<Constant>(top -> evaluate(env)));
+        } else if(Expr::is_variable(top)) {
+            Variable* topvar = (Variable*)top;
+            ((Operation*)exp_stack.top()) -> set_right(std::make_shared<Variable>(topvar -> get_name()));
         }
         delete top;
     }
@@ -188,15 +224,18 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens) {
     auto top = exp_stack.top();
     if (Expr::is_constant(top)) {
         std::cout << "top is a const\n";
-        return std::make_shared<Constant>(top -> evaluate());
-    } else {
+        return std::make_shared<Constant>(top -> evaluate(env));
+    } else if(Expr::is_operation(top)) {
         Operation* toper = (Operation*)top;
         return std::make_shared<Operation>(toper -> get_left(), toper -> get_right(), toper -> get_op());
+    } else if(Expr::is_variable(top)) {
+        Variable* topvar = (Variable*)top;
+        return std::make_shared<Variable>(topvar -> get_name());
     }
-    
+    return nullptr; // should never get here
 }
 
-std::shared_ptr<Expression> Compiler::compile(std::string program) {
+Program Compiler::compile(std::string program, Environment* env) {
     remove_char(program, ' ');
     std::cout << program << "\n";
 
@@ -207,5 +246,13 @@ std::shared_ptr<Expression> Compiler::compile(std::string program) {
 
     std::cout << "\n";
 
-    return tokens_to_expr(tokens);
+    return Program(tokens_to_expr(tokens, env));
+}
+
+Program::Program(std::shared_ptr<Expression> root){
+    root_ = root;
+}
+
+float Program::execute(Environment* env) {
+    return root_ -> evaluate(env);
 }

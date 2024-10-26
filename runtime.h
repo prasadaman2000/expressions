@@ -8,13 +8,15 @@
 #include <cmath>
 #include <set>
 
-enum class ExpressionType {Base, Constant, Operation};
+enum class ExpressionType {Base, Constant, Operation, Variable};
+
+class Environment;
 
 class Expression {
 public:
     Expression() = default;
     ~Expression() = default;
-    virtual float evaluate(){return 0;};
+    virtual float evaluate(Environment* env){return 0;};
     virtual ExpressionType Type(){return ExpressionType::Base;};
 };
 
@@ -22,7 +24,7 @@ class Constant : public Expression {
 public:
     Constant() = default;
     Constant(float x);
-    float evaluate() override;
+    float evaluate(Environment* env) override;
     ExpressionType Type() override {return ExpressionType::Constant;};
 private:
     float v_;
@@ -60,12 +62,32 @@ public:
     Operator get_op();
     bool is_complete();
     void set_op(Operator op);
-    float evaluate() override;
+    float evaluate(Environment* env) override;
     ExpressionType Type() override {return ExpressionType::Operation;};
 private:
     std::shared_ptr<Expression> lhs_ = nullptr;
     std::shared_ptr<Expression> rhs_ = nullptr;
     Operator op_;
+};
+
+class Variable : public Expression {
+public:
+    Variable() = default;
+    Variable(std::string name);
+    float evaluate(Environment* env) override;
+    std::string get_name();
+    ExpressionType Type() override {return ExpressionType::Variable;};
+private:
+    std::string name_;
+};
+
+class Environment {
+public:
+    Environment();
+    std::shared_ptr<Expression> get(std::string);
+    void add(std::string, std::shared_ptr<Expression>);
+private:
+    std::map<std::string, std::shared_ptr<Expression>> vars;
 };
 
 #endif //RUNTIME_H

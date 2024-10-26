@@ -2,9 +2,19 @@
 
 #include <memory>
 #include <string>
+#include <map>
+
+class Program {
+public:
+    Program() = default;
+    Program(std::shared_ptr<Expression>);
+    float execute(Environment* env);
+private:
+    std::shared_ptr<Expression> root_;
+};
 
 class Compiler {
 public:
     Compiler() = default;
-    std::shared_ptr<Expression> compile(std::string program);
+    Program compile(std::string, Environment*);
 };

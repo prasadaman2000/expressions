@@ -6,7 +6,7 @@ Constant::Constant(float x){
     v_ = x;
 }
 
-float Constant::evaluate() {
+float Constant::evaluate(Environment* _) {
     return v_;
 }
 
@@ -61,10 +61,39 @@ bool Operation::is_complete() {
     return (lhs_ != nullptr) && (rhs_ != nullptr);
 }
 
-float Operation::evaluate() {
+float Operation::evaluate(Environment* env) {
     // std::cout << "Evaluating operation " <<  op_.id() << "with " << lhs_ << " " << rhs_ << "\n";
-    float lhs_eval = lhs_ -> evaluate();
-    float rhs_eval = rhs_ -> evaluate();
+    float lhs_eval = lhs_ -> evaluate(env);
+    float rhs_eval = rhs_ -> evaluate(env);
     std::cout << "Evaluating operation " <<  op_.id() << " with " << lhs_eval << ", " << rhs_eval << "\n";
     return op_.apply(lhs_eval, rhs_eval);
+}
+
+Variable::Variable(std::string name) {
+    name_ = name;
+}
+
+float Variable::evaluate(Environment* env) {
+    return env -> get(name_) -> evaluate(env);
+}
+
+std::string Variable::get_name() {
+    return name_;
+}
+
+Environment::Environment() {
+    vars.insert({"pi", std::make_shared<Constant>(3.14159265)});
+}
+
+std::shared_ptr<Expression> Environment::get(std::string s) {
+    if(vars.find(s) != vars.end()) {
+        return vars.at(s);
+    }
+
+    std::cout << "No identifier " << s << " in environment.\n";
+    return nullptr;
+}
+
+void Environment::add(std::string s, std::shared_ptr<Expression> exp){
+    vars.insert({s, exp});
 }

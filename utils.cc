@@ -15,11 +15,16 @@ bool Expr::is_low_prio_operation(std::string token) {
 }
 
 bool Expr::is_constant(Expression* e) {
-    std::cout << "is constant: " << (e -> Type() == ExpressionType::Constant) << std::endl;
+    std::cout << "is constant: " << ((e -> Type()) == ExpressionType::Constant) << std::endl;
     return (e -> Type()) == ExpressionType::Constant;
 }
 
 bool Expr::is_operation(Expression* e) {
     std::cout << "is operation: " << (e -> Type() == ExpressionType::Operation) << std::endl;
     return (e -> Type()) == ExpressionType::Operation;
+}
+
+bool Expr::is_variable(Expression* e) {
+    std::cout << "is variable: " << ((e -> Type()) == ExpressionType::Variable) << std::endl;
+    return (e -> Type()) == ExpressionType::Variable;
 }
