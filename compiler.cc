@@ -8,6 +8,9 @@
 #include <stack>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
 
 void remove_char(std::string& x, char c) {
     x.erase(std::remove(x.begin(), x.end(), ' '), x.end());
@@ -35,7 +38,7 @@ bool is_number(std::string s){
             return false;
         }
     }
-    return true;
+    return s.size() > 0;
 }
 
 bool is_word(std::string s) {
@@ -47,13 +50,39 @@ bool is_word(std::string s) {
     return true;
 }
 
-std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Environment* env) { 
+bool is_whitespace(std::string s) {
+    for(auto c : s) {
+        if(!std::isspace(c)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<std::string> read_func_expr_from_file(std::string func_name) {
+    std::filesystem::path file_path = "./functions/" + func_name + ".func";
+    if(!std::filesystem::exists(file_path)) return std::vector<std::string>();
+    std::ifstream file(file_path);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+
+    std::string program_str = buffer.str();
+    remove_char(program_str, ' ');
+    return tokenize(program_str);
+}
+
+std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Environment* env, std::string scope) { 
+    std::cout << "entering tokens_to_expr\n";
     std::shared_ptr<Operation> last_oper;
     std::stack<Expression*> exp_stack;
     for (auto tokenp = tokens.begin(); tokenp != tokens.end(); ++tokenp) {
         auto token = *tokenp;
         Expression *uninserted = nullptr;
-
+        std::cout << "Processing token " << token << std::endl;
+        if(is_whitespace(token)) {
+            std::cout << "Skipping whitespace token [" << token << "]\n"; 
+            continue;
+        }
         // if parentheses, create expression out of everything in between the parens
         // creates a  (0 + expr) in order to support the RHS stealing that comes
         // out of multiplications
@@ -72,16 +101,59 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Envi
                 std::cout << "Error: unmatched parens\n";
                 return nullptr;
             }
+            std::cout << "entering paren expression with stack size " << exp_stack.size() << std::endl;
             std::shared_ptr<Expression> in_paren =
-                tokens_to_expr(std::vector<std::string>(tokenp + 1, token_iter - 1), env);
+                tokens_to_expr(std::vector<std::string>(tokenp + 1, token_iter - 1), env, scope);
+            std::cout << "exiting paren expression with stack size " << exp_stack.size() << std::endl;
             auto zero = std::make_shared<Constant>(0);
             Operation* paren_oper = new Operation(zero, in_paren, predef_operators.at("+"));
             uninserted = paren_oper;
             tokenp = token_iter;
         } else if(is_number(token)) {
+            std::cout << "stof on " << token << std::endl;
             uninserted = new Constant(std::stof(token));
         } else if(is_word(token)) {
-            uninserted = new Variable(token);
+            auto tokenized_file = read_func_expr_from_file(token);
+            if(tokenized_file.size() > 0){
+                std::cout << "if this was a function, the tokenized length would be: " << tokenized_file.size() << std::endl;
+                std::string scope_suffix = std::to_string(rand());
+                auto func_expr = tokens_to_expr(tokenized_file, env, scope + scope_suffix);
+                auto zero = std::make_shared<Constant>(0);
+                Operation* paren_oper = new Operation(zero, func_expr, predef_operators.at("+"));
+                std::shared_ptr<Expression> in_paren;
+                if(*(tokenp + 1) == "(") {
+                    auto token_iter = tokenp + 2;
+                    int num_open_paren = 1;
+                    while(num_open_paren > 0 && token_iter != tokens.end()){
+                        std::cout << "token_iter = " << *(token_iter) << "\n";
+                        if (*token_iter == ")") {
+                            --num_open_paren;
+                        } else if (*token_iter == "(") {
+                            ++num_open_paren;
+                        }
+                        ++token_iter;
+                    }
+                    if(num_open_paren > 0){
+                        std::cout << "Error: unmatched parens\n";
+                        return nullptr;
+                    }
+                    std::cout << "generating expr for paren for func from token " << *(tokenp+2) << " to " << *(token_iter - 1) << "\n";
+                    in_paren = tokens_to_expr(std::vector<std::string>(tokenp + 2, token_iter - 1), env, scope);
+                    std::cout << "generated expr for paren for func\n";
+                    tokenp = token_iter;
+                }
+                env -> add("x" + scope_suffix, in_paren);
+                uninserted = paren_oper;
+            } else {
+                // if the variable is a predefined constant, keep the original name, else make it a scoped variable
+                if (env -> get(token) != nullptr) {
+                    uninserted = new Variable(token);
+                } else {
+                    std::string var_name = token + scope;
+                    uninserted = new Variable(token + scope);
+                    env -> add(var_name, nullptr);
+                }
+            }
         } else {
             // if operation is a * / ^, take the RHS of the last operation and make it
             // the current operation's LHS. Push operation onto stack
@@ -148,11 +220,12 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Envi
         //              this ensures that all consecutive high priority operations
         //              are grouped and executed together
         if (uninserted != nullptr) {
+            std::cout << "uninserted not null AND stack size is: " << exp_stack.size() << std::endl;
             if (exp_stack.empty()) {
                 exp_stack.push(uninserted);
             } else {
                 auto top = exp_stack.top();
-                std::cout << "type_id: " << typeid(*top).name() << "\n";
+                std::cout << "top type_id: " << typeid(*top).name() << "\n";
                 if(Expr::is_constant(top) || Expr::is_variable(top)) {
                     std::cout << "Error: constant/paren came after constant/variable\n";
                     return nullptr;
@@ -223,12 +296,14 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Envi
 
     auto top = exp_stack.top();
     if (Expr::is_constant(top)) {
-        std::cout << "top is a const\n";
+        std::cout << "returning a const\n";
         return std::make_shared<Constant>(top -> evaluate(env));
     } else if(Expr::is_operation(top)) {
+        std::cout << "returning an operation\n";
         Operation* toper = (Operation*)top;
         return std::make_shared<Operation>(toper -> get_left(), toper -> get_right(), toper -> get_op());
     } else if(Expr::is_variable(top)) {
+        std::cout << "returning a variable\n";
         Variable* topvar = (Variable*)top;
         return std::make_shared<Variable>(topvar -> get_name());
     }
@@ -246,7 +321,7 @@ Program Compiler::compile(std::string program, Environment* env) {
 
     std::cout << "\n";
 
-    return Program(tokens_to_expr(tokens, env));
+    return Program(tokens_to_expr(tokens, env, ""));
 }
 
 Program::Program(std::shared_ptr<Expression> root){

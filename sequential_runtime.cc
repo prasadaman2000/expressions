@@ -74,6 +74,8 @@ Variable::Variable(std::string name) {
 }
 
 float Variable::evaluate(Environment* env) {
+    // std::cout << "evaluating " << name_ << std::endl;
+    // env -> dump();
     return env -> get(name_) -> evaluate(env);
 }
 
@@ -95,5 +97,13 @@ std::shared_ptr<Expression> Environment::get(std::string s) {
 }
 
 void Environment::add(std::string s, std::shared_ptr<Expression> exp){
-    vars.insert({s, exp});
+    std::cout << "inserting: " << s << ": " << exp << std::endl;
+    vars[s] = exp;
+    // dump();
+}
+
+void Environment::dump() {
+    for(auto [k,v] : vars){
+        std::cout << k << ": " << v << std::endl;
+    }
 }

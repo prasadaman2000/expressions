@@ -86,6 +86,13 @@ public:
     Environment();
     std::shared_ptr<Expression> get(std::string);
     void add(std::string, std::shared_ptr<Expression>);
+    void dump();
+    auto begin() {
+        return vars.begin();
+    };
+    auto end() {
+        return vars.end();
+    };
 private:
     std::map<std::string, std::shared_ptr<Expression>> vars;
 };
