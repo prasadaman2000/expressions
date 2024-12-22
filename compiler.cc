@@ -331,3 +331,25 @@ Program::Program(std::shared_ptr<Expression> root){
 float Program::execute(Environment* env) {
     return root_ -> evaluate(env);
 }
+
+std::string Program::dump(Environment* env, Expression *exp) {
+    if(exp == nullptr){
+        exp = root_.get();
+    }
+    if(Expr::is_constant(exp)) {
+        return std::to_string(((Constant *)exp) -> get());
+    } else if (Expr::is_variable(exp)) {
+        Variable* var = (Variable*)exp;
+        Expression* resolved_var = env -> get(var -> get_name()).get();
+        if(Expr::is_operation(resolved_var)) {
+            return dump(env, resolved_var);
+        }
+        return var -> get_name();
+    } else if (Expr::is_operation(exp)) {
+        Operation* oper = (Operation*)exp;
+        return "(" + dump(env, oper -> get_left().get()) + ")" +
+            (oper -> get_op()).id() + "(" +
+            dump(env, oper -> get_right().get()) + ")";
+    }
+    return "";
+}

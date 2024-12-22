@@ -25,6 +25,7 @@ public:
     Constant() = default;
     Constant(float x);
     float evaluate(Environment* env) override;
+    float get();
     ExpressionType Type() override {return ExpressionType::Constant;};
 private:
     float v_;
@@ -86,7 +87,31 @@ public:
     Environment();
     std::shared_ptr<Expression> get(std::string);
     void add(std::string, std::shared_ptr<Expression>);
-    void dump();
+    void increment_evaled_operators(uint thread_id) {
+        ++operators_evaluated[thread_id];
+    };
+    void increment_evaled_constants(uint thread_id) {
+        ++constants_evaluated[thread_id];
+    };
+    void increment_evaled_variables(uint thread_id) {
+        ++variables_evaluated[thread_id];
+    };
+    void dump_variables() {
+        for(auto [k,v] : vars){
+            std::cout << k << ": " << v << std::endl;
+        }
+    }
+    void dump_eval_stats() {
+        for (auto [k,v] : operators_evaluated) {
+            std::cout << "thread " << k << ": " << v << " operations evaluated.\n";
+        }
+        for (auto [k,v] : constants_evaluated) {
+            std::cout << "thread " << k << ": " << v << " constants evaluated.\n";
+        }
+        for (auto [k,v] : variables_evaluated) {
+            std::cout << "thread " << k << ": " << v << " variables evaluated.\n";
+        }
+    }
     auto begin() {
         return vars.begin();
     };
@@ -95,9 +120,9 @@ public:
     };
 private:
     std::map<std::string, std::shared_ptr<Expression>> vars;
-    uint operators_evaluated = 0;
-    uint constants_evaluated = 0;
-    uint variables_evaluated = 0;
+    std::map<uint, uint> operators_evaluated;
+    std::map<uint, uint> constants_evaluated;
+    std::map<uint, uint> variables_evaluated;
 };
 
 #endif //RUNTIME_H

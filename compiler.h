@@ -9,6 +9,7 @@ public:
     Program() = default;
     Program(std::shared_ptr<Expression>);
     float execute(Environment* env);
+    std::string dump(Environment* env, Expression *exp);
 private:
     std::shared_ptr<Expression> root_;
 };

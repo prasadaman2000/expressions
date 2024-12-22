@@ -7,7 +7,12 @@ Constant::Constant(float x){
     v_ = x;
 }
 
-float Constant::evaluate(Environment* _) {
+float Constant::evaluate(Environment* env) {
+    env->increment_evaled_constants(/*thread_id=*/0);
+    return v_;
+}
+
+float Constant::get() {
     return v_;
 }
 
@@ -67,6 +72,7 @@ float Operation::evaluate(Environment* env) {
     float lhs_eval = lhs_ -> evaluate(env);
     float rhs_eval = rhs_ -> evaluate(env);
     LOG(1, "Evaluating operation " <<  op_.id() << " with " << lhs_eval << ", " << rhs_eval << "\n")
+    env -> increment_evaled_operators(/*thread_id=*/0);
     return op_.apply(lhs_eval, rhs_eval);
 }
 
@@ -75,8 +81,7 @@ Variable::Variable(std::string name) {
 }
 
 float Variable::evaluate(Environment* env) {
-    // std::cout << "evaluating " << name_ << std::endl;
-    // env -> dump();
+    env -> increment_evaled_variables(/*thread_id=*/0);
     return env -> get(name_) -> evaluate(env);
 }
 
@@ -102,10 +107,4 @@ void Environment::add(std::string s, std::shared_ptr<Expression> exp){
     LOG(3, "inserting: " << s << ": " << exp << std::endl)
     vars[s] = exp;
     // dump();
-}
-
-void Environment::dump() {
-    for(auto [k,v] : vars){
-        std::cout << k << ": " << v << std::endl;
-    }
 }
