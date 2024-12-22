@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "log.h"
 
 // class Constant
 
@@ -65,7 +66,7 @@ float Operation::evaluate(Environment* env) {
     // std::cout << "Evaluating operation " <<  op_.id() << "with " << lhs_ << " " << rhs_ << "\n";
     float lhs_eval = lhs_ -> evaluate(env);
     float rhs_eval = rhs_ -> evaluate(env);
-    std::cout << "Evaluating operation " <<  op_.id() << " with " << lhs_eval << ", " << rhs_eval << "\n";
+    LOG(1, "Evaluating operation " <<  op_.id() << " with " << lhs_eval << ", " << rhs_eval << "\n")
     return op_.apply(lhs_eval, rhs_eval);
 }
 
@@ -93,12 +94,12 @@ std::shared_ptr<Expression> Environment::get(std::string s) {
         return vars.at(s);
     }
 
-    std::cout << "No identifier " << s << " in environment.\n";
+    LOG(1, "No identifier " << s << " in environment.\n")
     return nullptr;
 }
 
 void Environment::add(std::string s, std::shared_ptr<Expression> exp){
-    std::cout << "inserting: " << s << ": " << exp << std::endl;
+    LOG(3, "inserting: " << s << ": " << exp << std::endl)
     vars[s] = exp;
     // dump();
 }

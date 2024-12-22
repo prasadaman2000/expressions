@@ -95,6 +95,9 @@ public:
     };
 private:
     std::map<std::string, std::shared_ptr<Expression>> vars;
+    uint operators_evaluated = 0;
+    uint constants_evaluated = 0;
+    uint variables_evaluated = 0;
 };
 
 #endif //RUNTIME_H
