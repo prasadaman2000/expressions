@@ -84,7 +84,8 @@ std::string Variable::get_name() {
 }
 
 Environment::Environment() {
-    vars.insert({"pi", std::make_shared<Constant>(3.14159265)});
+    vars.insert({"pi", std::make_shared<Constant>(M_PI)});
+    vars.insert({"e", std::make_shared<Constant>(M_E)});
 }
 
 std::shared_ptr<Expression> Environment::get(std::string s) {

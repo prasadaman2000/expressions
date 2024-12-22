@@ -142,7 +142,7 @@ std::shared_ptr<Expression> tokens_to_expr(std::vector<std::string> tokens, Envi
                     std::cout << "generated expr for paren for func\n";
                     tokenp = token_iter;
                 }
-                env -> add("x" + scope_suffix, in_paren);
+                env -> add("x" + scope + scope_suffix, in_paren);
                 uninserted = paren_oper;
             } else {
                 // if the variable is a predefined constant, keep the original name, else make it a scoped variable
