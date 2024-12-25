@@ -21,7 +21,7 @@ std::vector<std::string> tokenize(std::string expr) {
     std::vector<std::string> tokens;
     std::string cur_token = "";
     for (char c : expr) {
-        if (isalnum(c)) {
+        if (isalnum(c) || (c == '.')) {
             cur_token += c;
         } else {
             tokens.push_back(cur_token);
@@ -35,7 +35,7 @@ std::vector<std::string> tokenize(std::string expr) {
 
 bool is_number(std::string s){
     for (char c : s){
-        if(!isdigit(c)){
+        if(!(isdigit(c) || (c == '.'))){
             return false;
         }
     }
