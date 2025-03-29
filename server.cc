@@ -43,7 +43,7 @@ Server::Server(int port) {
 void Server::start() {
     listen_thread_ = std::thread([this, server_fd_ = &server_fd_](){
         while(true) {
-            std::cout << "waiting!\n";
+            std::cout << "waiting! \n";
 
             int clientSocket = accept(*server_fd_, nullptr, nullptr);
             char buffer[1024] = { 0 };
