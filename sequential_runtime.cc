@@ -82,6 +82,9 @@ Variable::Variable(std::string name) {
 
 float Variable::evaluate(Environment* env) {
     env -> increment_evaled_variables(/*thread_id=*/0);
+    if (env -> get(name_) == nullptr) {
+        throw std::string("Variable " + name_ + " is not set.");
+    }
     return env -> get(name_) -> evaluate(env);
 }
 
